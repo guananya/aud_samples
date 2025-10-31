@@ -1,752 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HF Audio Dataset Viewer</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2em;
-        }
-        
-        .stats {
-            color: #666;
-            margin-bottom: 20px;
-            font-size: 0.9em;
-        }
-        
-        .controls {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        
-        .sort-controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        input, select, button {
-            padding: 10px 15px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-        
-        input:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        button {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .table-container {
-            overflow-x: auto;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
-        
-        th {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 12px;
-            text-align: left;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            white-space: nowrap;
-        }
-        
-        th.numeric-sortable {
-            cursor: pointer;
-            user-select: none;
-        }
-        
-        th.numeric-sortable:hover {
-            background: linear-gradient(135deg, #5a6fd8, #6a4190);
-        }
-        
-        th.numeric-sortable::after {
-            content: ' ↕';
-            opacity: 0.5;
-        }
-        
-        th.sorted-asc::after {
-            content: ' ↑';
-            opacity: 1;
-        }
-        
-        th.sorted-desc::after {
-            content: ' ↓';
-            opacity: 1;
-        }
-        
-        td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        tr:hover {
-            background: #f8f9ff;
-        }
-        
-        td.numeric {
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
-        
-        .audio-player {
-            width: 150px;
-        }
-        
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 20px;
-            padding: 20px;
-            background: #f9f9f9;
-            border-radius: 10px;
-        }
-        
-        .page-info {
-            margin: 0 15px;
-            color: #666;
-            font-weight: bold;
-        }
-        
-        .page-buttons {
-            display: flex;
-            gap: 5px;
-        }
-        
-        .page-btn {
-            min-width: 40px;
-            padding: 8px 12px;
-            font-size: 14px;
-        }
-        
-        .page-btn.active {
-            background: #333;
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            font-size: 1.2em;
-            color: #666;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background: #e0e0e0;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            transition: width 0.3s;
-        }
-        
-        .error {
-            background: #fee;
-            color: #c00;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        
-        .truncate {
-            max-width: 200px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        
-        .quick-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .stat-label {
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        
-        .stat-value {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #333;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🎵 HuggingFace Audio Dataset Viewer</h1>
-        <div class="stats" id="stats">Loading dataset information...</div>
-        
-        <div class="controls">
-            <input type="text" id="datasetName" placeholder="username/dataset-name" value="">
-            <button onclick="loadDataset()">Load Dataset</button>
-            <select id="split">
-                <option value="train">Train</option>
-                <option value="test">Test</option>
-                <option value="validation">Validation</option>
-            </select>
-        </div>
-        
-        <div id="error" class="error" style="display: none;"></div>
-        
-        <div class="sort-controls" id="sortControls" style="display: none;">
-            <label>Sort by numeric column:</label>
-            <select id="numericColumns">
-                <option value="">-- Select column --</option>
-            </select>
-            <button onclick="sortData('asc')">Sort Ascending ↑</button>
-            <button onclick="sortData('desc')">Sort Descending ↓</button>
-            <button onclick="resetSort()">Reset Order</button>
-        </div>
-        
-        <div class="quick-stats" id="quickStats" style="display: none;"></div>
-        
-        <div class="table-container">
-            <table id="dataTable">
-                <thead id="tableHead"></thead>
-                <tbody id="tableBody">
-                    <tr><td colspan="100%" class="loading">Enter a dataset name and click Load Dataset</td></tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="pagination" id="pagination" style="display: none;"></div>
-    </div>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processed Audio Samples</title>
 
-    <script>
-        let allData = [];
-        let sortedData = [];
-        let currentPage = 1;
-        let sortColumn = null;
-        let sortDirection = null;
-        let columns = [];
-        let numericColumns = [];
-        let originalOrder = [];
-        const ROWS_PER_PAGE = 500;
-        
-        // Initialize with URL parameters if present
-        window.onload = () => {
-            const params = new URLSearchParams(window.location.search);
-            const dataset = params.get('dataset');
-            if (dataset) {
-                document.getElementById('datasetName').value = dataset;
-                loadDataset();
-            }
-        };
-        
-        async function loadDataset() {
-            const datasetName = document.getElementById('datasetName').value.trim();
-            if (!datasetName) {
-                showError('Please enter a dataset name');
-                return;
-            }
-            
-            // Update URL
-            const url = new URL(window.location);
-            url.searchParams.set('dataset', datasetName);
-            window.history.pushState({}, '', url);
-            
-            const split = document.getElementById('split').value;
-            
-            showLoading('Connecting to Hugging Face...');
-            hideError();
-            
-            try {
-                // First, get dataset info
-                const infoResponse = await fetch(`https://datasets-server.huggingface.co/info?dataset=${datasetName}`);
-                if (!infoResponse.ok) throw new Error('Dataset not found or not accessible');
-                const info = await infoResponse.json();
-                
-                // Get total number of rows
-                const firstBatch = await fetch(
-                    `https://datasets-server.huggingface.co/rows?dataset=${datasetName}&config=${info.dataset_info.default.config_name}&split=${split}&offset=0&length=1`
-                );
-                const firstData = await firstBatch.json();
-                const totalRows = firstData.num_rows_total || 38000;
-                
-                // Load data in chunks
-                const pageSize = 100;
-                let offset = 0;
-                allData = [];
-                
-                // Create progress bar
-                showLoadingWithProgress(0, totalRows);
-                
-                while (offset < totalRows) {
-                    const response = await fetch(
-                        `https://datasets-server.huggingface.co/rows?dataset=${datasetName}&config=${info.dataset_info.default.config_name}&split=${split}&offset=${offset}&length=${pageSize}`
-                    );
-                    
-                    if (!response.ok) {
-                        if (offset === 0) throw new Error('Failed to load dataset');
-                        break;
-                    }
-                    
-                    const data = await response.json();
-                    
-                    if (data.rows && data.rows.length > 0) {
-                        const newRows = data.rows.map((r, idx) => ({
-                            ...r.row,
-                            _original_index: offset + idx
-                        }));
-                        allData = allData.concat(newRows);
-                        
-                        // Update progress
-                        showLoadingWithProgress(allData.length, totalRows);
-                        
-                        // Get columns from first batch
-                        if (offset === 0 && allData.length > 0) {
-                            identifyColumns();
-                        }
-                        
-                        if (data.rows.length < pageSize) break;
-                    } else {
-                        break;
-                    }
-                    
-                    offset += pageSize;
-                    
-                    // Small delay to prevent rate limiting
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-                
-                // Store original order
-                originalOrder = [...allData];
-                sortedData = [...allData];
-                
-                // Setup UI
-                setupSortControls();
-                updateStats();
-                updateQuickStats();
-                renderTableHeader();
-                renderTable();
-                document.getElementById('pagination').style.display = 'flex';
-                document.getElementById('sortControls').style.display = 'flex';
-                document.getElementById('quickStats').style.display = 'grid';
-                
-            } catch (error) {
-                showError(`Error: ${error.message}`);
-                console.error('Error loading dataset:', error);
-            }
-        }
-        
-        function showLoading(message) {
-            document.getElementById('tableBody').innerHTML = 
-                `<tr><td colspan="100%" class="loading">${message}</td></tr>`;
-        }
-        
-        function showLoadingWithProgress(current, total) {
-            const percent = Math.round((current / total) * 100);
-            document.getElementById('tableBody').innerHTML = 
-                `<tr><td colspan="100%" class="loading">
-                    Loading dataset: ${current.toLocaleString()} / ${total.toLocaleString()} rows (${percent}%)
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${percent}%"></div>
-                    </div>
-                </td></tr>`;
-        }
-        
-        function showError(message) {
-            const errorEl = document.getElementById('error');
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
-        }
-        
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
-        
-        function identifyColumns() {
-            if (allData.length === 0) return;
-            
-            columns = Object.keys(allData[0]).filter(col => col !== '_original_index');
-            numericColumns = [];
-            
-            // Identify numeric columns by checking first 10 rows
-            columns.forEach(col => {
-                const sample = allData.slice(0, Math.min(10, allData.length));
-                const isNumeric = sample.every(row => {
-                    const val = row[col];
-                    return val === null || val === undefined || typeof val === 'number';
-                });
-                
-                if (isNumeric && sample.some(row => typeof row[col] === 'number')) {
-                    numericColumns.push(col);
-                }
-            });
-        }
-        
-        function setupSortControls() {
-            const select = document.getElementById('numericColumns');
-            select.innerHTML = '<option value="">-- Select column --</option>';
-            
-            numericColumns.forEach(col => {
-                const option = document.createElement('option');
-                option.value = col;
-                option.textContent = col;
-                select.appendChild(option);
-            });
-        }
-        
-        function updateStats() {
-            const stats = document.getElementById('stats');
-            const totalPages = Math.ceil(sortedData.length / ROWS_PER_PAGE);
-            stats.innerHTML = `
-                <strong>Total rows:</strong> ${sortedData.length.toLocaleString()} | 
-                <strong>Columns:</strong> ${columns.length} | 
-                <strong>Numeric columns:</strong> ${numericColumns.length} | 
-                <strong>Pages:</strong> ${totalPages} (${ROWS_PER_PAGE} rows/page)
-            `;
-        }
-        
-        function updateQuickStats() {
-            const container = document.getElementById('quickStats');
-            container.innerHTML = '';
-            
-            // Show stats for first few numeric columns
-            numericColumns.slice(0, 6).forEach(col => {
-                const values = allData
-                    .map(row => row[col])
-                    .filter(val => typeof val === 'number');
-                
-                if (values.length > 0) {
-                    const min = Math.min(...values);
-                    const max = Math.max(...values);
-                    const avg = values.reduce((a, b) => a + b, 0) / values.length;
-                    
-                    const card = document.createElement('div');
-                    card.className = 'stat-card';
-                    card.innerHTML = `
-                        <div class="stat-label">${col}</div>
-                        <div class="stat-value" title="Min: ${min.toFixed(2)} | Max: ${max.toFixed(2)} | Avg: ${avg.toFixed(2)}">
-                            ${avg.toFixed(2)} <small style="color: #999;">avg</small>
-                        </div>
-                    `;
-                    container.appendChild(card);
-                }
-            });
-        }
-        
-        function renderTableHeader() {
-            const thead = document.getElementById('tableHead');
-            thead.innerHTML = '';
-            
-            const tr = document.createElement('tr');
-            tr.innerHTML = '<th>Row #</th>';
-            
-            columns.forEach(col => {
-                const th = document.createElement('th');
-                th.textContent = col;
-                
-                if (numericColumns.includes(col)) {
-                    th.className = 'numeric-sortable';
-                    th.title = 'Click to sort';
-                    th.onclick = () => quickSort(col);
-                    
-                    if (sortColumn === col) {
-                        th.className += sortDirection === 'asc' ? ' sorted-asc' : ' sorted-desc';
-                    }
-                }
-                
-                tr.appendChild(th);
-            });
-            
-            thead.appendChild(tr);
-        }
-        
-        function renderTable() {
-            const start = (currentPage - 1) * ROWS_PER_PAGE;
-            const end = start + ROWS_PER_PAGE;
-            const pageData = sortedData.slice(start, end);
-            
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-            
-            if (pageData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="100%" class="loading">No data to display</td></tr>';
-                return;
-            }
-            
-            pageData.forEach((row, idx) => {
-                const tr = document.createElement('tr');
-                
-                // Show original row number or current position
-                const rowNum = sortColumn ? start + idx + 1 : row._original_index + 1;
-                tr.innerHTML = `<td><strong>${rowNum}</strong></td>`;
-                
-                columns.forEach(col => {
-                    const td = document.createElement('td');
-                    const value = row[col];
-                    
-                    // Handle different data types
-                    if (value === null || value === undefined) {
-                        td.textContent = '-';
-                        td.style.color = '#ccc';
-                    } else if (col === 'audio' && typeof value === 'object' && value.path) {
-                        if (value.path.startsWith('http')) {
-                            td.innerHTML = `<audio controls class="audio-player"><source src="${value.path}"></audio>`;
-                        } else {
-                            td.textContent = 'Audio file';
-                        }
-                    } else if (typeof value === 'object') {
-                        td.innerHTML = `<span class="truncate" title="${JSON.stringify(value)}">${JSON.stringify(value)}</span>`;
-                    } else if (typeof value === 'number') {
-                        td.textContent = Number.isInteger(value) ? value : value.toFixed(4);
-                        td.className = 'numeric';
-                    } else {
-                        td.innerHTML = `<span class="truncate" title="${value}">${value}</span>`;
-                    }
-                    
-                    tr.appendChild(td);
-                });
-                
-                tbody.appendChild(tr);
-            });
-            
-            renderPagination();
-        }
-        
-        function renderPagination() {
-            const totalPages = Math.ceil(sortedData.length / ROWS_PER_PAGE);
-            const pagination = document.getElementById('pagination');
-            pagination.innerHTML = '';
-            
-            if (totalPages <= 1) return;
-            
-            // First button
-            const firstBtn = document.createElement('button');
-            firstBtn.textContent = '⏮ First';
-            firstBtn.className = 'page-btn';
-            firstBtn.disabled = currentPage === 1;
-            firstBtn.onclick = () => goToPage(1);
-            pagination.appendChild(firstBtn);
-            
-            // Previous button
-            const prevBtn = document.createElement('button');
-            prevBtn.textContent = '← Previous';
-            prevBtn.className = 'page-btn';
-            prevBtn.disabled = currentPage === 1;
-            prevBtn.onclick = () => goToPage(currentPage - 1);
-            pagination.appendChild(prevBtn);
-            
-            // Page number buttons
-            const pageButtons = document.createElement('div');
-            pageButtons.className = 'page-buttons';
-            
-            // Calculate page range to show
-            let startPage = Math.max(1, currentPage - 2);
-            let endPage = Math.min(totalPages, startPage + 4);
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
-            
-            if (startPage > 1) {
-                const dots = document.createElement('span');
-                dots.textContent = '...';
-                dots.style.padding = '0 10px';
-                pageButtons.appendChild(dots);
-            }
-            
-            for (let i = startPage; i <= endPage; i++) {
-                const pageBtn = document.createElement('button');
-                pageBtn.textContent = i;
-                pageBtn.className = 'page-btn';
-                if (i === currentPage) {
-                    pageBtn.className += ' active';
-                }
-                pageBtn.onclick = () => goToPage(i);
-                pageButtons.appendChild(pageBtn);
-            }
-            
-            if (endPage < totalPages) {
-                const dots = document.createElement('span');
-                dots.textContent = '...';
-                dots.style.padding = '0 10px';
-                pageButtons.appendChild(dots);
-            }
-            
-            pagination.appendChild(pageButtons);
-            
-            // Page info
-            const pageInfo = document.createElement('span');
-            pageInfo.className = 'page-info';
-            const startRow = (currentPage - 1) * ROWS_PER_PAGE + 1;
-            const endRow = Math.min(currentPage * ROWS_PER_PAGE, sortedData.length);
-            pageInfo.innerHTML = `
-                Page ${currentPage} of ${totalPages}<br>
-                Rows ${startRow.toLocaleString()}-${endRow.toLocaleString()} of ${sortedData.length.toLocaleString()}
-            `;
-            pagination.appendChild(pageInfo);
-            
-            // Next button
-            const nextBtn = document.createElement('button');
-            nextBtn.textContent = 'Next →';
-            nextBtn.className = 'page-btn';
-            nextBtn.disabled = currentPage === totalPages;
-            nextBtn.onclick = () => goToPage(currentPage + 1);
-            pagination.appendChild(nextBtn);
-            
-            // Last button
-            const lastBtn = document.createElement('button');
-            lastBtn.textContent = 'Last ⏭';
-            lastBtn.className = 'page-btn';
-            lastBtn.disabled = currentPage === totalPages;
-            lastBtn.onclick = () => goToPage(totalPages);
-            pagination.appendChild(lastBtn);
-        }
-        
-        function goToPage(page) {
-            const totalPages = Math.ceil(sortedData.length / ROWS_PER_PAGE);
-            if (page >= 1 && page <= totalPages) {
-                currentPage = page;
-                renderTable();
-                // Scroll to top of table
-                document.querySelector('.table-container').scrollTop = 0;
-            }
-        }
-        
-        function sortData(direction) {
-            const column = document.getElementById('numericColumns').value;
-            if (!column) {
-                showError('Please select a numeric column to sort');
-                return;
-            }
-            
-            sortColumn = column;
-            sortDirection = direction;
-            
-            showLoading('Sorting dataset...');
-            
-            // Sort the entire dataset
-            sortedData = [...allData].sort((a, b) => {
-                let aVal = a[column];
-                let bVal = b[column];
-                
-                // Handle nulls - put them at the end
-                if (aVal === null || aVal === undefined) return direction === 'asc' ? 1 : -1;
-                if (bVal === null || bVal === undefined) return direction === 'asc' ? -1 : 1;
-                
-                // Numeric comparison
-                if (direction === 'asc') {
-                    return aVal - bVal;
-                } else {
-                    return bVal - aVal;
-                }
-            });
-            
-            currentPage = 1;
-            renderTableHeader();
-            renderTable();
-            updateStats();
-        }
-        
-        function quickSort(column) {
-            // Toggle sort direction if same column
-            if (sortColumn === column) {
-                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                sortColumn = column;
-                sortDirection = 'asc';
-            }
-            
-            // Update dropdown
-            document.getElementById('numericColumns').value = column;
-            
-            // Perform sort
-            sortData(sortDirection);
-        }
-        
-        function resetSort() {
-            sortColumn = null;
-            sortDirection = null;
-            sortedData = [...originalOrder];
-            currentPage = 1;
-            
-            document.getElementById('numericColumns').value = '';
-            renderTableHeader();
-            renderTable();
-            updateStats();
-        }
-    </script>
+  <!-- Minimal modern style -->
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f6f8;
+      color: #222;
+    }
+
+    header {
+      background: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      padding: 1.2rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0;
+      color: #111;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #555;
+      margin-left: 0.5rem;
+    }
+
+    main {
+      padding: 1.5rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    iframe {
+      border: none;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 1400px;
+      height: 85vh;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      background: white;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.85rem;
+      color: #666;
+    }
+
+    @media (max-width: 768px) {
+      iframe {
+        height: 80vh;
+      }
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div>
+      <h1>Processed Audio Samples</h1>
+      <span class="subtitle">Hosted on Hugging Face Datasets</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- 👇 Embedded Hugging Face dataset viewer -->
+    <iframe
+      src="https://huggingface.co/datasets/ananyahume/processed_audio_samples/embed/viewer"
+      allow="clipboard-write"
+      loading="lazy"
+    ></iframe>
+  </main>
+
+  <footer>
+    © 2025 Ananya Gupta · Powered by Hugging Face Datasets
+  </footer>
 </body>
 </html>
