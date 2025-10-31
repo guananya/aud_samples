@@ -347,12 +347,26 @@
         .clear-filters:hover {
             background: #c0392b;
         }
+        
+        .info-box {
+            background: #3498db;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Audio Dataset Viewer</h1>
+            
+            <div class="info-box">
+                📊 All rows are displayed by default. Use filters below to narrow down results (optional).
+            </div>
+            
             <div class="controls">
                 <input type="text" id="searchBox" placeholder="Search text, transcript, description...">
                 <select id="filterLanguage">
@@ -369,7 +383,7 @@
             
             <div class="column-selector" id="columnSelector">
                 <div class="column-selector-header">
-                    <h3>Visible Columns (select which tag columns to show)</h3>
+                    <h3>📋 Show Tag Columns (check boxes to add sortable columns to the table)</h3>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" class="tag-search" id="columnSearch" placeholder="Search columns...">
                         <button class="toggle-btn" onclick="toggleColumnSelector()">Hide</button>
@@ -382,7 +396,7 @@
             
             <div class="tag-filters" id="tagFilters">
                 <div class="tag-filters-header">
-                    <h3>Tag Filters (filter rows by tag thresholds)</h3>
+                    <h3>🔍 Filter Rows by Tags (optional - check boxes to filter rows that meet threshold)</h3>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" class="tag-search" id="tagSearch" placeholder="Search tags...">
                         <button class="clear-filters" onclick="clearAllFilters()">Clear All</button>
@@ -396,8 +410,8 @@
         </div>
         
         <div class="stats">
-            <div class="stat">Total: <strong id="totalCount">0</strong></div>
-            <div class="stat">Filtered: <strong id="filteredCount">0</strong></div>
+            <div class="stat">Total Rows: <strong id="totalCount">0</strong></div>
+            <div class="stat">Showing: <strong id="filteredCount">0</strong></div>
             <div class="stat">Avg Duration: <strong id="avgDuration">0</strong>s</div>
             <div class="stat">Avg CPS: <strong id="avgCPS">0</strong></div>
         </div>
@@ -446,15 +460,12 @@
         let filteredData = [];
         let allTags = [];
         let visibleTags = new Set(); // Tags to show as columns
-        let activeTagFilters = {}; // {tagName: threshold}
+        let activeTagFilters = {}; // {tagName: threshold} - ONLY filters if checkbox is checked
         let sortColumn = 'id';
         let sortDirection = 'asc';
         let currentPage = 0;
         let pageSize = 100;
         let totalPages = 1;
-        
-        // Fixed columns (always visible)
-        const fixedColumns = ['id', 'audio', 'duration', 'CPS', 'pq', 'snr', 'language', 'txt', 'transcript'];
         
         // Load dataset from Hugging Face
         async function loadDataset() {
@@ -524,6 +535,7 @@
                 buildColumnSelector();
                 buildTagFilters();
                 
+                // Show all data by default
                 filteredData = [...allData];
                 updateTableHeaders();
                 renderTable();
@@ -726,7 +738,7 @@
                     else if (durFilter === '20+') durMatch = dur > 20;
                 }
                 
-                // Tag filters (AND logic - all selected tags must meet threshold)
+                // Tag filters - ONLY applies if checkboxes are checked
                 let tagMatch = true;
                 for (const [tagName, threshold] of Object.entries(activeTagFilters)) {
                     if (!item.tags[tagName] || item.tags[tagName] < threshold) {
