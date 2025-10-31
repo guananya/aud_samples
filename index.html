@@ -1,100 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Processed Audio Samples</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Processed Audio Samples — Fast Viewer</title>
 
-  <!-- Minimal modern style -->
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-        Roboto, Helvetica, Arial, sans-serif;
-      background: #f5f6f8;
-      color: #222;
-    }
+<!-- Grid.js -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@6.0.6/dist/theme/mermaid.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/gridjs@6.0.6/dist/gridjs.umd.js"></script>
 
-    header {
-      background: white;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-      padding: 1.2rem 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
+<!-- Polars (WASM) -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/node-polars@latest/dist/polars.min.js"></script>
 
-    h1 {
-      font-size: 1.4rem;
-      font-weight: 600;
-      margin: 0;
-      color: #111;
-    }
-
-    .subtitle {
-      font-size: 0.9rem;
-      color: #555;
-      margin-left: 0.5rem;
-    }
-
-    main {
-      padding: 1.5rem;
-      display: flex;
-      justify-content: center;
-    }
-
-    iframe {
-      border: none;
-      border-radius: 12px;
-      width: 100%;
-      max-width: 1400px;
-      height: 85vh;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-      background: white;
-    }
-
-    footer {
-      text-align: center;
-      padding: 1rem;
-      font-size: 0.85rem;
-      color: #666;
-    }
-
-    @media (max-width: 768px) {
-      iframe {
-        height: 80vh;
-      }
-      header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.4rem;
-      }
-    }
-  </style>
+<style>
+  body {font-family: system-ui, sans-serif; background: #fafafa; margin:0;}
+  header {
+    background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.1);
+    padding:1rem 2rem; position:sticky; top:0; z-index:10;
+  }
+  h1 {margin:0; font-size:1.5rem;}
+  #filters {
+    display:flex; gap:1rem; flex-wrap:wrap;
+    padding:1rem 2rem; background:#fff; border-bottom:1px solid #ddd;
+  }
+  #filters input,#filters select {
+    padding:.4rem .6rem; border-radius:6px; border:1px solid #ccc; font-size:.9rem;
+  }
+  #grid {padding:1rem 2rem;}
+</style>
 </head>
 
 <body>
-  <header>
-    <div>
-      <h1>Processed Audio Samples</h1>
-      <span class="subtitle">Hosted on Hugging Face Datasets</span>
-    </div>
-  </header>
+<header><h1>Processed Audio Samples (S3 + Polars Viewer)</h1></header>
 
-  <main>
-    <!-- 👇 Embedded Hugging Face dataset viewer -->
-    <iframe
-      src="https://huggingface.co/datasets/ananyahume/processed_audio_samples/embed/viewer"
-      allow="clipboard-write"
-      loading="lazy"
-    ></iframe>
-  </main>
+<div id="filters">
+  <label>🔎 Search text: <input id="textFilter" placeholder="transcript / description..." /></label>
+  <label>🎧 Accent: <input id="accentFilter" placeholder="e.g. Indian / British" /></label>
+  <label>Min duration: <input id="minDuration" type="number" step="0.1" placeholder="1" /></label>
+  <label>Max duration: <input id="maxDuration" type="number" step="0.1" placeholder="10" /></label>
+  <label>Min PQ: <input id="minPQ" type="number" step="0.1" placeholder="5" /></label>
+  <label>Max PQ: <input id="maxPQ" type="number" step="0.1" placeholder="10" /></label>
+  <button id="applyFilters">Apply</button>
+</div>
 
-  <footer>
-    © 2025 Ananya Gupta · Powered by Hugging Face Datasets
-  </footer>
+<div id="grid">Loading dataset…</div>
+
+<script type="module">
+import * as pl from "https://cdn.jsdelivr.net/npm/node-polars@latest/dist/polars.min.js";
+
+async function loadParquet(url){
+  const resp = await fetch(url);
+  if(!resp.ok) throw new Error(`Failed to load ${url}`);
+  const arr = await resp.arrayBuffer();
+  return await pl.readParquet(new Uint8Array(arr));
+}
+
+async function main(){
+  // 👉 replace with your real S3 parquet shard URLs
+  const parquetUrls = [
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_00.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_01.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_02.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_03.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_04.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_05.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_06.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_07.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_08.parquet",
+    "https://taggedsamples.s3.us-east-2.amazonaws.com/processed_audio_samples/samples_09.parquet",
+  ];
+
+  console.log("Loading Parquet shards…");
+  const dfs = await Promise.all(parquetUrls.map(loadParquet));
+  let df = pl.concat(dfs);
+
+  // Keep useful columns
+  const keepCols = df.columns.filter(c =>
+    ["audio","txt","transcript","accent_txt","duration.json","CPS","pq.json"].includes(c)
+  );
+  df = df.select(keepCols);
+
+  const toGridData = (frame, limit=1000) => {
+    const rows = frame.head(limit).toRecords();
+    return rows.map(r=>{
+      const row={};
+      for(const k of keepCols){
+        let val=r[k];
+        if(k==="audio" && val){
+          val=`<audio controls src="${val}" preload="none" style="width:140px"></audio>`;
+        }
+        row[k]=val;
+      }
+      return row;
+    });
+  };
+
+  const renderTable=(records)=>{
+    const grid=new gridjs.Grid({
+      columns: keepCols.map(c=>({
+        name:c,
+        sort:true,
+        formatter:cell=>gridjs.html(cell??"")
+      })),
+      data: records.map(r=>keepCols.map(c=>r[c])),
+      search:{enabled:true},
+      pagination:{enabled:true,limit:25},
+      sort:true,
+      resizable:true
+    });
+    document.getElementById("grid").innerHTML="";
+    grid.render(document.getElementById("grid"));
+  };
+
+  let currentData=toGridData(df);
+  renderTable(currentData);
+
+  // --- Filter logic ---
+  document.getElementById("applyFilters").addEventListener("click",()=>{
+    let filtered=df.clone();
+
+    const text=document.getElementById("textFilter").value.trim().toLowerCase();
+    const accent=document.getElementById("accentFilter").value.trim().toLowerCase();
+    const minDur=parseFloat(document.getElementById("minDuration").value);
+    const maxDur=parseFloat(document.getElementById("maxDuration").value);
+    const minPQ=parseFloat(document.getElementById("minPQ").value);
+    const maxPQ=parseFloat(document.getElementById("maxPQ").value);
+
+    if(text){
+      filtered=filtered.filter(
+        pl.col("transcript").str.contains(text).or(pl.col("txt").str.contains(text))
+      );
+    }
+    if(accent){
+      filtered=filtered.filter(pl.col("accent_txt").str.contains(accent));
+    }
+    if(!isNaN(minDur)){
+      filtered=filtered.filter(pl.col("duration.json").gt(minDur));
+    }
+    if(!isNaN(maxDur)){
+      filtered=filtered.filter(pl.col("duration.json").lt(maxDur));
+    }
+    if(!isNaN(minPQ)){
+      filtered=filtered.filter(pl.col("pq.json").gt(minPQ));
+    }
+    if(!isNaN(maxPQ)){
+      filtered=filtered.filter(pl.col("pq.json").lt(maxPQ));
+    }
+
+    currentData=toGridData(filtered);
+    renderTable(currentData);
+  });
+}
+main();
+</script>
 </body>
 </html>
+
