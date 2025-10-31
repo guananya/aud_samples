@@ -18,7 +18,7 @@
         }
         
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
             background: white;
             border-radius: 8px;
@@ -49,6 +49,57 @@
             border-radius: 4px;
             font-size: 14px;
             background: white;
+        }
+        
+        .column-selector {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        .column-selector-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .column-selector h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .column-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #2c3e50;
+            border-radius: 4px;
+        }
+        
+        .column-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: #34495e;
+            border-radius: 4px;
+            font-size: 12px;
+            color: white;
+        }
+        
+        .column-item input[type="checkbox"] {
+            cursor: pointer;
+        }
+        
+        .column-item label {
+            cursor: pointer;
+            flex: 1;
         }
         
         .tag-filters {
@@ -183,7 +234,7 @@
         
         .table-container {
             overflow-x: auto;
-            max-height: calc(100vh - 400px);
+            max-height: calc(100vh - 500px);
         }
         
         table {
@@ -248,22 +299,6 @@
             overflow: visible;
         }
         
-        .tags-cell {
-            max-width: 400px;
-            font-size: 12px;
-            line-height: 1.4;
-        }
-        
-        .tag-badge {
-            display: inline-block;
-            background: #3498db;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin: 2px;
-            font-size: 11px;
-        }
-        
         audio {
             width: 250px;
             height: 32px;
@@ -280,7 +315,7 @@
             color: #7f8c8d;
         }
         
-        .toggle-tags {
+        .toggle-btn {
             background: #3498db;
             color: white;
             border: none;
@@ -290,11 +325,12 @@
             font-size: 13px;
         }
         
-        .toggle-tags:hover {
+        .toggle-btn:hover {
             background: #2980b9;
         }
         
-        .tag-filters.collapsed .tag-filter-grid {
+        .tag-filters.collapsed .tag-filter-grid,
+        .column-selector.collapsed .column-grid {
             display: none;
         }
         
@@ -331,13 +367,26 @@
                 </select>
             </div>
             
+            <div class="column-selector" id="columnSelector">
+                <div class="column-selector-header">
+                    <h3>Visible Columns (select which tag columns to show)</h3>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="text" class="tag-search" id="columnSearch" placeholder="Search columns...">
+                        <button class="toggle-btn" onclick="toggleColumnSelector()">Hide</button>
+                    </div>
+                </div>
+                <div class="column-grid" id="columnGrid">
+                    <div class="loading">Loading columns...</div>
+                </div>
+            </div>
+            
             <div class="tag-filters" id="tagFilters">
                 <div class="tag-filters-header">
-                    <h3>Tag Filters (select tags and set minimum thresholds)</h3>
+                    <h3>Tag Filters (filter rows by tag thresholds)</h3>
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <input type="text" class="tag-search" id="tagSearch" placeholder="Search tags...">
                         <button class="clear-filters" onclick="clearAllFilters()">Clear All</button>
-                        <button class="toggle-tags" onclick="toggleTagFilters()">Hide Filters</button>
+                        <button class="toggle-btn" onclick="toggleTagFilters()">Hide</button>
                     </div>
                 </div>
                 <div class="tag-filter-grid" id="tagFilterGrid">
@@ -355,7 +404,7 @@
         
         <div class="table-container">
             <table id="dataTable">
-                <thead>
+                <thead id="tableHead">
                     <tr>
                         <th class="sortable" data-column="id">ID</th>
                         <th>Audio</th>
@@ -366,11 +415,10 @@
                         <th class="sortable" data-column="language">Language</th>
                         <th>Text</th>
                         <th>Transcript</th>
-                        <th>Top Tags (>0.1)</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
-                    <tr><td colspan="10" class="loading">Loading data...</td></tr>
+                    <tr><td colspan="20" class="loading">Loading data...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -397,12 +445,16 @@
         let allData = [];
         let filteredData = [];
         let allTags = [];
+        let visibleTags = new Set(); // Tags to show as columns
         let activeTagFilters = {}; // {tagName: threshold}
         let sortColumn = 'id';
         let sortDirection = 'asc';
         let currentPage = 0;
         let pageSize = 100;
         let totalPages = 1;
+        
+        // Fixed columns (always visible)
+        const fixedColumns = ['id', 'audio', 'duration', 'CPS', 'pq', 'snr', 'language', 'txt', 'transcript'];
         
         // Load dataset from Hugging Face
         async function loadDataset() {
@@ -468,18 +520,30 @@
                     langSelect.appendChild(option);
                 });
                 
-                // Build tag filters UI
+                // Build UIs
+                buildColumnSelector();
                 buildTagFilters();
                 
                 filteredData = [...allData];
+                updateTableHeaders();
                 renderTable();
                 updateStats();
                 
             } catch (error) {
                 console.error('Error loading dataset:', error);
                 document.getElementById('tableBody').innerHTML = 
-                    `<tr><td colspan="10" class="loading" style="color: red;">Error loading dataset: ${error.message}</td></tr>`;
+                    `<tr><td colspan="20" class="loading" style="color: red;">Error loading dataset: ${error.message}</td></tr>`;
             }
+        }
+        
+        function buildColumnSelector() {
+            const grid = document.getElementById('columnGrid');
+            grid.innerHTML = allTags.map(tag => `
+                <div class="column-item">
+                    <input type="checkbox" id="col_${tag}" value="${tag}" onchange="window.toggleColumn('${tag}', this.checked)">
+                    <label for="col_${tag}">${tag}</label>
+                </div>
+            `).join('');
         }
         
         function buildTagFilters() {
@@ -500,7 +564,83 @@
             `).join('');
         }
         
+        function updateTableHeaders() {
+            const thead = document.getElementById('tableHead');
+            const headers = ['<th class="sortable" data-column="id">ID</th>',
+                           '<th>Audio</th>',
+                           '<th class="sortable" data-column="duration">Duration</th>',
+                           '<th class="sortable" data-column="CPS">CPS</th>',
+                           '<th class="sortable" data-column="pq">PQ</th>',
+                           '<th class="sortable" data-column="snr">SNR</th>',
+                           '<th class="sortable" data-column="language">Language</th>',
+                           '<th>Text</th>',
+                           '<th>Transcript</th>'];
+            
+            // Add tag column headers
+            visibleTags.forEach(tag => {
+                headers.push(`<th class="sortable" data-column="tag_${tag}">tag_${tag}</th>`);
+            });
+            
+            thead.innerHTML = `<tr>${headers.join('')}</tr>`;
+            
+            // Re-attach sort listeners
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const column = th.dataset.column;
+                    
+                    if (sortColumn === column) {
+                        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortColumn = column;
+                        sortDirection = 'asc';
+                    }
+                    
+                    // Update UI
+                    document.querySelectorAll('th.sortable').forEach(t => {
+                        t.classList.remove('sort-asc', 'sort-desc');
+                    });
+                    th.classList.add(`sort-${sortDirection}`);
+                    
+                    // Sort data
+                    filteredData.sort((a, b) => {
+                        let aVal, bVal;
+                        
+                        if (column.startsWith('tag_')) {
+                            const tagName = column.substring(4);
+                            aVal = a.tags[tagName] || 0;
+                            bVal = b.tags[tagName] || 0;
+                        } else {
+                            aVal = a[column];
+                            bVal = b[column];
+                        }
+                        
+                        if (typeof aVal === 'string') {
+                            return sortDirection === 'asc' 
+                                ? aVal.localeCompare(bVal)
+                                : bVal.localeCompare(aVal);
+                        } else {
+                            return sortDirection === 'asc'
+                                ? aVal - bVal
+                                : bVal - aVal;
+                        }
+                    });
+                    
+                    renderTable();
+                });
+            });
+        }
+        
         // Make functions globally accessible
+        window.toggleColumn = function(tagName, isVisible) {
+            if (isVisible) {
+                visibleTags.add(tagName);
+            } else {
+                visibleTags.delete(tagName);
+            }
+            updateTableHeaders();
+            renderTable();
+        };
+        
         window.toggleTagFilter = function(tagName, isChecked) {
             if (isChecked) {
                 const threshold = parseFloat(document.getElementById(`threshold_${tagName}`).value);
@@ -528,13 +668,29 @@
             const filters = document.getElementById('tagFilters');
             const btn = event.target;
             filters.classList.toggle('collapsed');
-            btn.textContent = filters.classList.contains('collapsed') ? 'Show Filters' : 'Hide Filters';
+            btn.textContent = filters.classList.contains('collapsed') ? 'Show' : 'Hide';
+        };
+        
+        window.toggleColumnSelector = function() {
+            const selector = document.getElementById('columnSelector');
+            const btn = event.target;
+            selector.classList.toggle('collapsed');
+            btn.textContent = selector.classList.contains('collapsed') ? 'Show' : 'Hide';
         };
         
         // Search and filter
         document.getElementById('searchBox').addEventListener('input', filterData);
         document.getElementById('filterLanguage').addEventListener('change', filterData);
         document.getElementById('filterDuration').addEventListener('change', filterData);
+        
+        // Column search
+        document.getElementById('columnSearch').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('.column-item').forEach(item => {
+                const colName = item.querySelector('label').textContent.toLowerCase();
+                item.style.display = colName.includes(searchTerm) ? 'flex' : 'none';
+            });
+        });
         
         // Tag search
         document.getElementById('tagSearch').addEventListener('input', (e) => {
@@ -587,44 +743,6 @@
             updateStats();
         }
         
-        // Sorting
-        document.querySelectorAll('th.sortable').forEach(th => {
-            th.addEventListener('click', () => {
-                const column = th.dataset.column;
-                
-                if (sortColumn === column) {
-                    sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-                } else {
-                    sortColumn = column;
-                    sortDirection = 'asc';
-                }
-                
-                // Update UI
-                document.querySelectorAll('th.sortable').forEach(t => {
-                    t.classList.remove('sort-asc', 'sort-desc');
-                });
-                th.classList.add(`sort-${sortDirection}`);
-                
-                // Sort data
-                filteredData.sort((a, b) => {
-                    let aVal = a[column];
-                    let bVal = b[column];
-                    
-                    if (typeof aVal === 'string') {
-                        return sortDirection === 'asc' 
-                            ? aVal.localeCompare(bVal)
-                            : bVal.localeCompare(aVal);
-                    } else {
-                        return sortDirection === 'asc'
-                            ? aVal - bVal
-                            : bVal - aVal;
-                    }
-                });
-                
-                renderTable();
-            });
-        });
-        
         // Pagination
         window.goToPage = function(page) {
             if (page >= 0 && page < totalPages) {
@@ -643,7 +761,7 @@
             const tbody = document.getElementById('tableBody');
             
             if (filteredData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="loading">No results found</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="${9 + visibleTags.size}" class="loading">No results found</td></tr>`;
                 return;
             }
             
@@ -654,31 +772,28 @@
             const pageData = filteredData.slice(startIdx, endIdx);
             
             tbody.innerHTML = pageData.map(item => {
-                // Get top tags above 0.1
-                const topTags = Object.entries(item.tags)
-                    .filter(([_, value]) => value > 0.1)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([tag, value]) => `<span class="tag-badge">${tag}: ${value.toFixed(2)}</span>`)
-                    .join('');
-                
                 // Handle audio path
                 const audioPath = item.audio?.path || item.audio || '';
                 
-                return `
-                    <tr>
-                        <td class="num-cell">${item.id}</td>
-                        <td><audio controls preload="none" src="${audioPath}"></audio></td>
-                        <td class="num-cell">${item.duration.toFixed(2)}</td>
-                        <td class="num-cell">${item.CPS.toFixed(1)}</td>
-                        <td class="num-cell">${item.pq.toFixed(2)}</td>
-                        <td class="num-cell">${item.snr.toFixed(1)}</td>
-                        <td>${item.language}</td>
-                        <td class="text-cell" title="${item.txt}">${item.txt}</td>
-                        <td class="text-cell" title="${item.transcript}">${item.transcript}</td>
-                        <td class="tags-cell">${topTags || '<span style="color: #999;">No high tags</span>'}</td>
-                    </tr>
-                `;
+                const cells = [
+                    `<td class="num-cell">${item.id}</td>`,
+                    `<td><audio controls preload="none" src="${audioPath}"></audio></td>`,
+                    `<td class="num-cell">${item.duration.toFixed(2)}</td>`,
+                    `<td class="num-cell">${item.CPS.toFixed(1)}</td>`,
+                    `<td class="num-cell">${item.pq.toFixed(2)}</td>`,
+                    `<td class="num-cell">${item.snr.toFixed(1)}</td>`,
+                    `<td>${item.language}</td>`,
+                    `<td class="text-cell" title="${item.txt}">${item.txt}</td>`,
+                    `<td class="text-cell" title="${item.transcript}">${item.transcript}</td>`
+                ];
+                
+                // Add tag columns
+                visibleTags.forEach(tag => {
+                    const value = item.tags[tag] || 0;
+                    cells.push(`<td class="num-cell">${value.toFixed(3)}</td>`);
+                });
+                
+                return `<tr>${cells.join('')}</tr>`;
             }).join('');
             
             // Update pagination UI
